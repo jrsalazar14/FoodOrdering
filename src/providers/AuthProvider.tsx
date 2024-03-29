@@ -1,3 +1,5 @@
+import { supabase } from "@lib/supabase";
+import { Session } from "@supabase/supabase-js";
 import {
   PropsWithChildren,
   createContext,
@@ -5,8 +7,6 @@ import {
   useEffect,
   useState,
 } from "react";
-import { supabase } from "../lib/supabase";
-import { Session } from "@supabase/supabase-js";
 
 type AuthData = {
   session: Session | null;
@@ -17,14 +17,14 @@ type AuthData = {
 
 const AuthContext = createContext<AuthData>({
   session: null,
-  profile: null,
   loading: true,
+  profile: null,
   isAdmin: false,
 });
 
 export default function AuthProvider({ children }: PropsWithChildren) {
   const [session, setSession] = useState<Session | null>(null);
-  const [profile, setProfile] = useState(null); // [1
+  const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -32,6 +32,7 @@ export default function AuthProvider({ children }: PropsWithChildren) {
       const {
         data: { session },
       } = await supabase.auth.getSession();
+
       setSession(session);
 
       if (session) {
@@ -55,12 +56,7 @@ export default function AuthProvider({ children }: PropsWithChildren) {
 
   return (
     <AuthContext.Provider
-      value={{
-        session,
-        loading,
-        profile: profile as any,
-        isAdmin: (profile as any)?.group === "ADMIN",
-      }}
+      value={{ session, loading, profile, isAdmin: profile?.group === "ADMIN" }}
     >
       {children}
     </AuthContext.Provider>

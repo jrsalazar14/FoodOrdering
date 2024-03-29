@@ -33,7 +33,7 @@ const ProductDetailsScreen = () => {
       return;
     }
     addItem(product, selectedSize);
-    router.push("/cart");
+    router.navigate("/cart");
   };
 
   if (isLoading) {

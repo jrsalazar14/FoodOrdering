@@ -1,28 +1,36 @@
 import { useLocalSearchParams, Stack } from "expo-router";
-import { View, Text, StyleSheet, FlatList } from "react-native";
-import OrderListItem from "@/src/components/OrderListItem";
-import orders from "@/assets/data/orders";
+import {
+  View,
+  Text,
+  StyleSheet,
+  FlatList,
+  ActivityIndicator,
+} from "react-native";
 import OrderItemListItem from "@/src/components/OrderItemListItem";
+import { useOrderDetails } from "@/src/api/orders";
+import OrderListItem from "@/src/components/OrderListItem";
 
 const OrderDetailsScreen = () => {
-  const { id } = useLocalSearchParams();
+  const { id: idString } = useLocalSearchParams();
+  const id = parseFloat(typeof idString === "string" ? idString : idString[0]);
+  const { data: order, isLoading, error } = useOrderDetails(id);
 
-  const order = orders.find((o) => o.id.toString() === id);
-
-  if (!order) {
-    return <Text>Order not found</Text>;
+  if (isLoading) {
+    return <ActivityIndicator />;
+  }
+  if (error) {
+    return <Text>Failed to fetch order</Text>;
   }
 
   return (
     <View style={styles.container}>
-      <Stack.Screen options={{ title: `Order #${order.id}` }} />
-
-      <OrderListItem order={order} />
+      <Stack.Screen options={{ title: `Order #${id}` }} />
 
       <FlatList
-        data={order.order_items}
+        data={order?.order_items}
         renderItem={({ item }) => <OrderItemListItem item={item} />}
         contentContainerStyle={{ gap: 10 }}
+        ListHeaderComponent={() => order && <OrderListItem order={order} />}
       />
     </View>
   );
@@ -31,8 +39,11 @@ const OrderDetailsScreen = () => {
 const styles = StyleSheet.create({
   container: {
     backgroundColor: "white",
-    flex: 1,
     padding: 10,
+    borderRadius: 10,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
   },
   image: {
     width: "100%",
