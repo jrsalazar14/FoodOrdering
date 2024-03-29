@@ -89,14 +89,14 @@ export const useUpdateOrder = () => {
   return useMutation({
     async mutationFn({
       id,
-      updatedFields,
+      updatedField,
     }: {
       id: number;
-      updatedFields: UpdateTables<"orders">;
+      updatedField: UpdateTables<"orders">;
     }) {
       const { error, data: updatedOrder } = await supabase
         .from("orders")
-        .update(updatedFields)
+        .update(updatedField)
         .eq("id", id)
         .select()
         .single();
@@ -109,9 +109,6 @@ export const useUpdateOrder = () => {
     async onSuccess(_, { id }) {
       await queryClient.invalidateQueries({ queryKey: ["orders"] });
       await queryClient.invalidateQueries({ queryKey: ["orders", id] });
-    },
-    onError(error) {
-      console.error("Failed to insert product", error);
     },
   });
 };

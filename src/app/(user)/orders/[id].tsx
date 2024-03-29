@@ -9,6 +9,7 @@ import {
 import OrderItemListItem from "@/src/components/OrderItemListItem";
 import { useOrderDetails } from "@/src/api/orders";
 import OrderListItem from "@/src/components/OrderListItem";
+import { useUpdateOrderSubscription } from "@/src/api/orders/subscriptions";
 
 const OrderDetailsScreen = () => {
   const { id: idString } = useLocalSearchParams();
@@ -21,6 +22,8 @@ const OrderDetailsScreen = () => {
   if (error) {
     return <Text>Failed to fetch order</Text>;
   }
+
+  useUpdateOrderSubscription(id);
 
   return (
     <View style={styles.container}>

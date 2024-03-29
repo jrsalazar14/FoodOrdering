@@ -19,7 +19,7 @@ const OrderDetailsScreen = () => {
   const { mutate: updateOrder } = useUpdateOrder();
 
   const updateStatus = (status: string) => {
-    updateOrder({ id: id, updatedFields: { status } });
+    updateOrder({ id: id, updatedField: { status } });
   };
 
   if (isLoading) {
