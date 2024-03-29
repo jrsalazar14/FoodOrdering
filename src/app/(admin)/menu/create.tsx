@@ -1,8 +1,8 @@
-import { View, Text, StyleSheet, TextInput, Image, Alert } from "react-native";
-import React, { useEffect, useState } from "react";
 import Button from "@/src/components/Button";
 import { defaultPizzaImage } from "@/src/components/ProductListItem";
 import Colors from "@/src/constants/Colors";
+import { useEffect, useState } from "react";
+import { View, Text, StyleSheet, TextInput, Image, Alert } from "react-native";
 import * as ImagePicker from "expo-image-picker";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import {
@@ -12,16 +12,22 @@ import {
   useUpdateProduct,
 } from "@/src/api/products";
 
+import * as FileSystem from "expo-file-system";
+import { randomUUID } from "expo-crypto";
+import { supabase } from "@/src/lib/supabase";
+import { decode } from "base64-arraybuffer";
+
 const CreateProductScreen = () => {
   const [name, setName] = useState("");
   const [price, setPrice] = useState("");
-  const [error, setError] = useState("");
+  const [errors, setErrors] = useState("");
   const [image, setImage] = useState<string | null>(null);
 
   const { id: idString } = useLocalSearchParams();
-  const id = parseFloat(typeof idString === "string" ? idString : idString[0]);
-
-  const isUpdating = !!id;
+  const id = parseFloat(
+    typeof idString === "string" ? idString : idString?.[0]
+  );
+  const isUpdating = !!idString;
 
   const { mutate: insertProduct } = useInsertProduct();
   const { mutate: updateProduct } = useUpdateProduct();
@@ -36,26 +42,25 @@ const CreateProductScreen = () => {
       setPrice(updatingProduct.price.toString());
       setImage(updatingProduct.image);
     }
-  }, [updateProduct]);
+  }, [updatingProduct]);
 
-  const resetField = () => {
+  const resetFields = () => {
     setName("");
     setPrice("");
-    setImage("");
   };
 
   const validateInput = () => {
-    setError("");
+    setErrors("");
     if (!name) {
-      setError("Name is required");
+      setErrors("Name is required");
       return false;
     }
     if (!price) {
-      setError("Price is required");
+      setErrors("Price is required");
       return false;
     }
     if (isNaN(parseFloat(price))) {
-      setError("Price must be a number");
+      setErrors("Price is not a number");
       return false;
     }
     return true;
@@ -63,84 +68,106 @@ const CreateProductScreen = () => {
 
   const onSubmit = () => {
     if (isUpdating) {
+      // update
       onUpdate();
     } else {
       onCreate();
     }
   };
 
-  const onUpdate = () => {
+  const onCreate = async () => {
     if (!validateInput()) {
       return;
     }
-    console.warn("Updating product: ", name);
+
+    const imagePath = await uploadImage();
+
+    // Save in the database
+    insertProduct(
+      { name, price: parseFloat(price), image: imagePath },
+      {
+        onSuccess: () => {
+          resetFields();
+          router.back();
+        },
+      }
+    );
+  };
+
+  const onUpdate = async () => {
+    if (!validateInput()) {
+      return;
+    }
+
+    const imagePath = await uploadImage();
 
     updateProduct(
-      { id, name, price: parseFloat(price), image },
+      { id, name, price: parseFloat(price), image: imagePath },
       {
         onSuccess: () => {
-          resetField();
+          resetFields();
           router.back();
         },
       }
     );
-  };
-
-  const onCreate = () => {
-    if (!validateInput()) {
-      return;
-    }
-    console.warn("Create product: ", name);
-
-    insertProduct(
-      { name, price: parseFloat(price), image },
-      {
-        onSuccess: () => {
-          resetField();
-          router.back();
-        },
-      }
-    );
-  };
-
-  const onDelete = () => {
-    deleteProduct(id, {
-      onSuccess: () => {
-        resetField();
-        router.replace("/(admin)");
-      },
-    });
-  };
-
-  const confirmDelete = () => {
-    Alert.alert("Delete Product", "Are you sure?", [
-      {
-        text: "Cancel",
-      },
-      {
-        text: "Delete",
-        onPress: onDelete,
-        style: "destructive",
-      },
-    ]);
   };
 
   const pickImage = async () => {
-    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (status !== "granted") {
-      alert("Sorry, we need camera roll permissions to make this work!");
-      return;
-    }
+    // No permissions request is necessary for launching the image library
     let result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsEditing: true,
       aspect: [4, 3],
       quality: 1,
     });
+
     if (!result.canceled) {
       setImage(result.assets[0].uri);
     }
-    console.log(result);
+  };
+
+  const onDelete = () => {
+    deleteProduct(id, {
+      onSuccess: () => {
+        resetFields();
+        router.replace("/(admin)");
+      },
+    });
+  };
+
+  const confirmDelete = () => {
+    Alert.alert("Confirm", "Are you sure you want to delete this product", [
+      {
+        text: "Cancel",
+      },
+      {
+        text: "Delete",
+        style: "destructive",
+        onPress: onDelete,
+      },
+    ]);
+  };
+
+  const uploadImage = async () => {
+    if (!image?.startsWith("file://")) {
+      return;
+    }
+
+    const base64 = await FileSystem.readAsStringAsync(image, {
+      encoding: "base64",
+    });
+    const filePath = `${randomUUID()}.png`;
+    const contentType = "image/png";
+
+    const { data, error } = await supabase.storage
+      .from("product-images")
+      .upload(filePath, decode(base64), { contentType });
+
+    console.log(error);
+
+    if (data) {
+      return data.path;
+    }
   };
 
   return (
@@ -148,6 +175,7 @@ const CreateProductScreen = () => {
       <Stack.Screen
         options={{ title: isUpdating ? "Update Product" : "Create Product" }}
       />
+
       <Image
         source={{ uri: image || defaultPizzaImage }}
         style={styles.image}
@@ -173,7 +201,7 @@ const CreateProductScreen = () => {
         keyboardType="numeric"
       />
 
-      <Text style={{ color: "red" }}>{error}</Text>
+      <Text style={{ color: "red" }}>{errors}</Text>
       <Button onPress={onSubmit} text={isUpdating ? "Update" : "Create"} />
       {isUpdating && (
         <Text onPress={confirmDelete} style={styles.textButton}>
@@ -184,22 +212,12 @@ const CreateProductScreen = () => {
   );
 };
 
+export default CreateProductScreen;
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     justifyContent: "center",
     padding: 10,
-  },
-  label: {
-    color: "gray",
-    fontSize: 16,
-  },
-  input: {
-    backgroundColor: "white",
-    padding: 10,
-    borderRadius: 5,
-    marginTop: 5,
-    marginBottom: 20,
   },
   image: {
     width: "50%",
@@ -212,6 +230,16 @@ const styles = StyleSheet.create({
     color: Colors.light.tint,
     marginVertical: 10,
   },
-});
 
-export default CreateProductScreen;
+  input: {
+    backgroundColor: "white",
+    padding: 10,
+    borderRadius: 5,
+    marginTop: 5,
+    marginBottom: 20,
+  },
+  label: {
+    color: "gray",
+    fontSize: 16,
+  },
+});

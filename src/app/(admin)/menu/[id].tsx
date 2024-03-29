@@ -11,6 +11,7 @@ import { defaultPizzaImage } from "@/src/components/ProductListItem";
 import { FontAwesome } from "@expo/vector-icons";
 import Colors from "@/src/constants/Colors";
 import { useProduct } from "@/src/api/products";
+import RemoteImage from "@/src/components/RemoteImage";
 
 const ProductDetailsScreen = () => {
   const { id: idString } = useLocalSearchParams();
@@ -47,9 +48,10 @@ const ProductDetailsScreen = () => {
         }}
       />
       <Stack.Screen options={{ title: product?.name }} />
-      <Image
-        source={{ uri: product?.image || defaultPizzaImage }}
+      <RemoteImage
+        path={product?.image}
         style={styles.image}
+        fallback={defaultPizzaImage}
       />
       <Text style={styles.title}>{product?.name}</Text>
       <Text style={styles.price}>${product?.price}</Text>
